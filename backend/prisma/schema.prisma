@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobStatus {
+  PENDING // Waiting in Redis queue
+  PROCESSING // Worker is currently running FFmpeg
+  COMPLETED // Successfully finished and uploaded to R2
+  FAILED // Process error (e.g., corrupted file)
+}
+
+enum JobType {
+  COMPRESS
+  CONVERT
+  TRIM
+  THUMBNAIL
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobs Job[]
+
+  @@map("users")
+}
+
+model Job {
+  id String @id @default(uuid())
+
+  // Optional relation: If userId is null, the Job belongs to an Anonymous User
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  status JobStatus @default(PENDING)
+  type   JobType
+
+  // Flexible JSON payload (e.g., {"quality": "high"} or {"startTime": "00:10"})
+  settings Json
+
+  originalName String // e.g., "my_vacation.mp4"
+  inputUrl     String // Internal path or original R2 bucket URL
+  outputUrl    String? // Final download URL (null until completed)
+
+  // Metrics (stored in Bytes for mathematical precision)
+  sizeOriginal  Int
+  sizeProcessed Int?
+
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime // Vital for the "24h Deletion" business rule
+
+  @@map("jobs")
+}
