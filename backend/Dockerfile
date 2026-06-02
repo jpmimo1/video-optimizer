@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install FFmpeg at the OS level (Alpine keeps the image lightweight and fast)
 RUN apk add --no-cache ffmpeg

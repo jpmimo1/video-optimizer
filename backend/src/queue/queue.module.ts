@@ -5,15 +5,12 @@ import { BullModule } from '@nestjs/bullmq';
 @Global()
 @Module({
   imports: [
-    // 1. Conexión global a Redis
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
     }),
-
-    // 2. Registro de la cola específica
     BullModule.registerQueue({
       name: 'video-processing-queue',
     }),

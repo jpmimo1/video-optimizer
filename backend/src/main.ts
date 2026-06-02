@@ -1,8 +1,28 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 4000);
+  const processType = process.env.PROCESS_TYPE || 'API';
+
+  if (processType === 'WORKER') {
+    console.log('🚀 Starting container in WORKER mode (No HTTP server)...');
+
+    // createApplicationContext initializes NestJS without opening HTTP ports.
+    // It only loads services, the database, and Redis connections.
+    await NestFactory.createApplicationContext(AppModule);
+
+    // As a background process, we omit app.listen().
+    // The container will stay alive processing BullMQ jobs.
+  } else {
+    console.log('🚀 Starting container in API mode (Web Server)...');
+
+    const app = await NestFactory.create(AppModule);
+
+    app.useGlobalPipes(new ValidationPipe());
+
+    await app.listen(4000);
+    console.log('✅ API listening on http://localhost:4000');
+  }
 }
 bootstrap();

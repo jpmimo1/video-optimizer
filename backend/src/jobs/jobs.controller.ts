@@ -1,16 +1,17 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Post,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateJobDto } from './dto/create-job.dto';
+import { GetUploadUrlDto } from './dto/get-upload-url.dto';
 
 @Controller('api/v1/jobs')
 export class JobsController {
@@ -18,21 +19,24 @@ export class JobsController {
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
-  @UseInterceptors(FileInterceptor('file'))
-  async createJob(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() createJobDto: CreateJobDto,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Video file is required.');
+  async createJob(@Body() createJobDto: CreateJobDto) {
+    console.log(createJobDto);
+    return this.jobsService.create(createJobDto);
+  }
+
+  @Post('upload-url')
+  async getUploadUrl(@Body() dto: GetUploadUrlDto) {
+    return this.jobsService.generateUploadUrl(dto.fileName, dto.mimeType);
+  }
+
+  @Get(':id')
+  async getJobStatus(@Param('id', new ParseUUIDPipe()) id: string) {
+    const job = await this.jobsService.findOne(id);
+
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${id} not found.`);
     }
 
-    // Strict size validation (100 MB)
-    const MAX_SIZE = 100 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      throw new BadRequestException('File exceeds the 100MB maximum limit.');
-    }
-
-    return this.jobsService.create(file, createJobDto);
+    return job;
   }
 }

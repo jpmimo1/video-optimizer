@@ -19,10 +19,14 @@ export class QueueService {
    */
   async addVideoJob(jobId: string, type: JobType, payload: any): Promise<void> {
     try {
-      await this.videoQueue.add(type, {
-        jobId,
-        ...payload,
-      });
+      await this.videoQueue.add(
+        type,
+        {
+          jobId,
+          ...payload,
+        },
+        { jobId: jobId },
+      );
 
       this.logger.log(`✅ Job ${jobId} [${type}] successfully added to queue.`);
     } catch (error) {

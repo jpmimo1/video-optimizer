@@ -1,12 +1,25 @@
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+} from 'class-validator';
 import { JobType } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateJobDto {
   @IsEnum(JobType)
   @IsNotEmpty()
   type!: JobType;
 
-  // Settings are received as a string (JSON) because we are using FormData
+  @IsString()
+  @IsNotEmpty()
+  fileKey!: string; // Key generated during the pre-signed URL upload phase
+
+  @IsNumber()
+  @IsNotEmpty()
+  fileSize!: number; // File size in bytes
+
   @IsString()
   @IsOptional()
   settings?: string;

@@ -4,15 +4,17 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { QueueService } from 'src/queue/queue.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { JobStatus, Prisma } from '@prisma/client';
+import { R2Service } from 'src/r2/r2.service';
 
 @Injectable()
 export class JobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
+    private readonly r2Service: R2Service,
   ) {}
 
-  async create(file: Express.Multer.File, dto: CreateJobDto) {
+  async create(dto: CreateJobDto) {
     try {
       const settingsParams = dto.settings
         ? (JSON.parse(dto.settings) as Prisma.InputJsonValue)
@@ -21,28 +23,22 @@ export class JobsService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      // Note: In a production environment using the Pre-signed URL pattern,
-      // the file would already be in R2. For this local MVP, the Worker
-      // will read the file directly, so we store the buffer or simulate the inputUrl.
       const newJob = await this.prisma.job.create({
         data: {
           status: JobStatus.PENDING,
           type: dto.type,
-          originalName: file.originalname,
-          sizeOriginal: file.size,
-          // Added to satisfy the mandatory inputUrl field in the Prisma schema
-          inputUrl: 'local-buffer',
+          originalName: dto.fileKey.split('/').pop() || 'video.mp4',
+          sizeOriginal: dto.fileSize,
+          inputUrl: dto.fileKey,
           settings: settingsParams,
           expiresAt: expiresAt,
         },
       });
 
-      // Pass the file buffer to the worker for FFmpeg processing
-      // (In the future, this will be replaced by an R2 download URL)
       await this.queueService.addVideoJob(newJob.id, newJob.type, {
-        originalName: file.originalname,
+        originalName: newJob.originalName,
         settings: settingsParams,
-        fileBuffer: file.buffer,
+        fileKey: dto.fileKey,
       });
 
       return {
@@ -50,7 +46,7 @@ export class JobsService {
         status: newJob.status,
         type: newJob.type,
         originalName: newJob.originalName,
-        sizeOriginal: file.size,
+        sizeOriginal: newJob.sizeOriginal,
         createdAt: newJob.createdAt,
         expiresAt: newJob.expiresAt,
       };
@@ -60,5 +56,43 @@ export class JobsService {
         'Failed to create processing job.',
       );
     }
+  }
+
+  async generateUploadUrl(fileName: string, mimeType: string) {
+    return this.r2Service.getUploadPresignedUrl(fileName, mimeType);
+  }
+
+  async findOne(id: string) {
+    const job = await this.prisma.job.findUnique({
+      where: { id },
+    });
+
+    if (!job) {
+      return null;
+    }
+
+    const publicBaseUrl = process.env.R2_PUBLIC_URL || '';
+
+    // Construct the full playback URL only if the job completed successfully
+    let downloadUrl: string | null = null;
+    if (job.status === 'COMPLETED' && job.outputUrl) {
+      // Prevent double slash (/) issues when concatenating the URL
+      const cleanBaseUrl = publicBaseUrl.endsWith('/')
+        ? publicBaseUrl.slice(0, -1)
+        : publicBaseUrl;
+      downloadUrl = `${cleanBaseUrl}/${job.outputUrl}`;
+    }
+
+    // Return a mapped record to protect the internal database structure
+    return {
+      id: job.id,
+      status: job.status,
+      type: job.type,
+      originalName: job.originalName,
+      sizeOriginal: job.sizeOriginal,
+      createdAt: job.createdAt,
+      expiresAt: job.expiresAt,
+      videoUrl: downloadUrl,
+    };
   }
 }
