@@ -1,15 +1,25 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { JobType } from '@prisma/client';
-import { Queue } from 'bullmq';
+import { JobProgress, Queue, QueueEvents } from 'bullmq';
+import { Observable } from 'rxjs';
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleInit {
   private readonly logger = new Logger(QueueService.name);
+  private queueEvents!: QueueEvents;
 
   constructor(
     @InjectQueue('video-processing-queue') private readonly videoQueue: Queue,
   ) {}
+
+  async onModuleInit() {
+    const connection = await this.videoQueue.client;
+    this.queueEvents = new QueueEvents('video-processing-queue', {
+      connection,
+    });
+    this.logger.log('📡 QueueEvents listener initialized.');
+  }
 
   /**
    * Adds a new job to the processing queue.
@@ -35,5 +45,55 @@ export class QueueService {
       );
       throw error;
     }
+  }
+
+  streamJobProgress(jobId: string): Observable<MessageEvent> {
+    return new Observable((subscriber) => {
+      const onProgress = ({
+        jobId: eventJobId,
+        data,
+      }: {
+        jobId: string;
+        data: JobProgress;
+      }) => {
+        if (eventJobId === jobId) {
+          subscriber.next({
+            data: { status: 'PROCESSING', progress: Number(data) },
+          } as MessageEvent);
+        }
+      };
+
+      const onCompleted = ({ jobId: eventJobId }) => {
+        if (eventJobId === jobId) {
+          subscriber.next({
+            data: { status: 'COMPLETED', progress: 100 },
+          } as MessageEvent);
+          subscriber.complete();
+        }
+      };
+
+      const onFailed = ({ jobId: eventJobId, failedReason }: any) => {
+        if (eventJobId === jobId) {
+          subscriber.next({
+            data: {
+              status: 'FAILED',
+              progress: 0,
+              error: failedReason as string,
+            },
+          } as MessageEvent);
+          subscriber.complete();
+        }
+      };
+
+      this.queueEvents.on('progress', onProgress);
+      this.queueEvents.on('completed', onCompleted);
+      this.queueEvents.on('failed', onFailed);
+
+      return () => {
+        this.queueEvents.off('progress', onProgress);
+        this.queueEvents.off('completed', onCompleted);
+        this.queueEvents.off('failed', onFailed);
+      };
+    });
   }
 }

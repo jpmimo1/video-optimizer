@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -127,6 +128,18 @@ export class R2Service {
       throw new InternalServerErrorException(
         'Error uploading processed video.',
       );
+    }
+  }
+
+  async deleteFile(fileKey: string): Promise<void> {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: fileKey,
+      });
+      await this.s3Client.send(command);
+    } catch (error) {
+      console.error(`Error deleting file ${fileKey} from R2:`, error);
     }
   }
 }

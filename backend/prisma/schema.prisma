@@ -11,6 +11,7 @@ enum JobStatus {
   PROCESSING // Worker is currently running FFmpeg
   COMPLETED // Successfully finished and uploaded to R2
   FAILED // Process error (e.g., corrupted file)
+  EXPIRED
 }
 
 enum JobType {

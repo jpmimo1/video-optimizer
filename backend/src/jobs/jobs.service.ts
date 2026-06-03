@@ -5,6 +5,7 @@ import { QueueService } from 'src/queue/queue.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { JobStatus, Prisma } from '@prisma/client';
 import { R2Service } from 'src/r2/r2.service';
+import { Observable } from 'rxjs';
 
 @Injectable()
 export class JobsService {
@@ -94,5 +95,9 @@ export class JobsService {
       expiresAt: job.expiresAt,
       videoUrl: downloadUrl,
     };
+  }
+
+  streamJobProgress(jobId: string): Observable<MessageEvent> {
+    return this.queueService.streamJobProgress(jobId);
   }
 }

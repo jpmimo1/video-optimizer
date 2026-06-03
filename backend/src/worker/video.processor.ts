@@ -59,18 +59,30 @@ export class VideoProcessor extends WorkerHost {
       localOutputPath = path.join(os.tmpdir(), outputFileName);
 
       console.log(`⚙️ [Worker] Executing task: ${job.name}`);
+
+      const updateProgress = (percent: number) => {
+        job.updateProgress(percent).catch((err) => {
+          console.error(
+            `⚠️ Error saving progress to Redis:`,
+            (err as Error).message,
+          );
+        });
+      };
+
       switch (job.name) {
         case 'COMPRESS':
           await this.ffmpegService.compressVideo(
             localInputPath,
             localOutputPath,
             settings,
+            updateProgress,
           );
           break;
         case 'CONVERT':
           await this.ffmpegService.convertVideo(
             localInputPath,
             localOutputPath,
+            updateProgress,
           );
           break;
         case 'TRIM':
@@ -78,6 +90,7 @@ export class VideoProcessor extends WorkerHost {
             localInputPath,
             localOutputPath,
             settings,
+            updateProgress,
           );
           break;
         case 'THUMBNAIL':
@@ -85,6 +98,7 @@ export class VideoProcessor extends WorkerHost {
             localInputPath,
             localOutputPath,
             settings,
+            updateProgress,
           );
           break;
         default:

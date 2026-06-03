@@ -25,6 +25,7 @@ export class FfmpegService {
     inputPath: string,
     outputPath: string,
     settings: Prisma.InputJsonValue,
+    onProgress?: (percent: number) => void,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const opts = (settings as CompressSettings) || {};
@@ -43,22 +44,38 @@ export class FfmpegService {
         .videoCodec('libx264')
         .addOption('-crf', crf)
         .addOption('-preset', 'fast')
-        .save(outputPath)
+        .on('progress', (progress) => {
+          if (progress.percent && onProgress) {
+            const percent = Math.min(Math.round(progress.percent), 100);
+            onProgress(percent);
+          }
+        })
         .on('end', () => resolve(outputPath))
-        .on('error', (err) => reject(new Error(err.message)));
+        .on('error', (err) => reject(new Error(err.message)))
+        .save(outputPath);
     });
   }
 
-  async convertVideo(inputPath: string, outputPath: string): Promise<string> {
+  async convertVideo(
+    inputPath: string,
+    outputPath: string,
+    onProgress?: (percent: number) => void,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       // Note: The format is inherently determined by the outputPath extension,
       // which is configured upstream in the VideoProcessor.
       console.log(`🔄 [FFmpeg] Converting video...`);
 
       Ffmpeg(inputPath)
-        .save(outputPath)
+        .on('progress', (progress) => {
+          if (progress.percent && onProgress) {
+            const percent = Math.min(Math.round(progress.percent), 100);
+            onProgress(percent);
+          }
+        })
         .on('end', () => resolve(outputPath))
-        .on('error', (err) => reject(new Error(err.message)));
+        .on('error', (err) => reject(new Error(err.message)))
+        .save(outputPath);
     });
   }
 
@@ -66,6 +83,7 @@ export class FfmpegService {
     inputPath: string,
     outputPath: string,
     settings: Prisma.InputJsonValue,
+    onProgress?: (percent: number) => void,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const opts = (settings as TrimSettings) || {};
@@ -82,9 +100,15 @@ export class FfmpegService {
       }
 
       command
-        .save(outputPath)
+        .on('progress', (progress) => {
+          if (progress.percent && onProgress) {
+            const percent = Math.min(Math.round(progress.percent), 100);
+            onProgress(percent);
+          }
+        })
         .on('end', () => resolve(outputPath))
-        .on('error', (err) => reject(new Error(err.message)));
+        .on('error', (err) => reject(new Error(err.message)))
+        .save(outputPath);
     });
   }
 
@@ -92,6 +116,7 @@ export class FfmpegService {
     inputPath: string,
     outputPath: string,
     settings: Prisma.InputJsonValue,
+    onProgress?: (percent: number) => void,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const opts = (settings as ThumbnailSettings) || {};
@@ -102,9 +127,15 @@ export class FfmpegService {
       Ffmpeg(inputPath)
         .seekInput(second)
         .frames(1)
-        .save(outputPath)
+        .on('progress', (progress) => {
+          if (progress.percent && onProgress) {
+            const percent = Math.min(Math.round(progress.percent), 100);
+            onProgress(percent);
+          }
+        })
         .on('end', () => resolve(outputPath))
-        .on('error', (err) => reject(new Error(err.message)));
+        .on('error', (err) => reject(new Error(err.message)))
+        .save(outputPath);
     });
   }
 }

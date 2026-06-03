@@ -8,10 +8,12 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Sse,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { GetUploadUrlDto } from './dto/get-upload-url.dto';
+import { Observable } from 'rxjs';
 
 @Controller('api/v1/jobs')
 export class JobsController {
@@ -38,5 +40,12 @@ export class JobsController {
     }
 
     return job;
+  }
+
+  @Sse(':id/progress')
+  streamJobProgress(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Observable<MessageEvent> {
+    return this.jobsService.streamJobProgress(id);
   }
 }
