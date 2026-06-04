@@ -10,12 +10,14 @@ This repository is structured as a **monorepo** managing a decoupled microservic
 
 The platform is engineered using an asynchronous **Queue/Worker architecture** to isolate compute-heavy operations from the HTTP lifecycle, protecting the server from bottlenecks.
 
-* **Frontend:** Next.js (App Router, TypeScript, Tailwind CSS)
-* **Backend API:** NestJS (HTTP Endpoint Controller, Request Validator, Job Producer)
-* **Backend Worker:** NestJS + FFmpeg (Isolated background processor running on Alpine Linux)
-* **Message Broker / Queue Management:** Redis + BullMQ
-* **Database & ORM:** PostgreSQL + Prisma ORM (v7+)
-* **Storage Provider:** Cloudflare R2 (S3-compatible, $0 Egress fees for cost control)
+- **Environment:** Node.js 22 LTS across all services for V8 performance and security.
+- **Frontend:** Next.js 13+ (App Router, TypeScript, Tailwind CSS, Shadcn UI, Zustand for state management).
+- **Backend API:** NestJS (HTTP Endpoint Controller, Request Validator, Job Producer).
+- **Backend Worker:** NestJS + FFmpeg (Isolated background processor running on Alpine Linux).
+- **Message Broker / Queue Management:** Redis + BullMQ.
+- **Database & ORM:** PostgreSQL + Prisma ORM (v7+).
+- **Storage Provider:** Cloudflare R2 (S3-compatible, $0 Egress fees, direct pre-signed URL uploads).
+- **Infrastructure:** Multi-stage Docker builds optimized for VPS deployment.
 
 ---
 
@@ -24,18 +26,20 @@ The platform is engineered using an asynchronous **Queue/Worker architecture** t
 To mitigate server exploitation, secure cost predictability, and optimize hardware usage, the system enforces strict guardrails at the architectural level:
 
 ### Core Processing Operations
+
 1.  **Compression:** Reduce file size while preserving baseline visual fidelity (High Quality, Balanced, High Compression).
 2.  **Format Conversion:** Change containers natively between `mp4`, `webm`, and `mov`.
 3.  **Thumbnail Generation:** Extract a specific frame at second $X$ and export it as an image (`jpg`/`png`).
 4.  **Trimming:** Slice precise video segments based on timestamps (Start $\rightarrow$ End).
 
 ### Critical System Limits
-* **Max File Size:** 100 MB per file.
-* **Max Video Duration:** 5 minutes.
-* **Concurrency Limit:** Maximum 1 active processing job per user concurrently.
-* **Daily Quotas:** 3 jobs/day for anonymous users, 10 jobs/day for registered users.
-* **Processing Timeout:** Heavy tasks are automatically killed after 2 to 5 minutes to prevent hung worker threads.
-* **Data Retention Policy:** All source uploads and output files are permanently purged from Cloudflare R2 and PostgreSQL metadata after **24 hours** to prevent storage saturation.
+
+- **Max File Size:** 100 MB per file.
+- **Max Video Duration:** 5 minutes.
+- **Concurrency Limit:** Maximum 1 active processing job per user concurrently.
+- **Daily Quotas:** 3 jobs/day for anonymous users, 10 jobs/day for registered users.
+- **Processing Timeout:** Heavy tasks are automatically killed after 2 to 5 minutes to prevent hung worker threads.
+- **Data Retention Policy:** All source uploads and output files are permanently purged from Cloudflare R2 and PostgreSQL metadata after **24 hours** to prevent storage saturation.
 
 ---
 
@@ -54,17 +58,17 @@ Whenever you modify the database layer, execute these steps in order:
     ```bash
     npx prisma migrate dev --name your_change_description
     ```
-    *This creates the SQL file and updates the physical PostgreSQL database running in Docker via your exposed host port.*
+    _This creates the SQL file and updates the physical PostgreSQL database running in Docker via your exposed host port._
 3.  **Generate Local Types:** Run the generation command locally to update your host's `node_modules`:
     ```bash
     npx prisma generate
     ```
-    *This gives your local IDE immediate IntelliSense, autocompletion, and TypeScript type checking.*
+    _This gives your local IDE immediate IntelliSense, autocompletion, and TypeScript type checking._
 4.  **Synchronize Docker Containers:** Because the containers use an anonymous volume to shield their own `node_modules` from your host, they won't automatically see the new types. Force them to re-generate their internal Prisma Client by restarting the containers:
     ```bash
     docker-compose restart nestjs-api nestjs-worker
     ```
-    *On startup, the container overrides run `npx prisma generate` internally before boot, aligning both worlds seamlessly.*
+    _On startup, the container overrides run `npx prisma generate` internally before boot, aligning both worlds seamlessly._
 
 ---
 
@@ -76,3 +80,14 @@ Whenever you modify the database layer, execute these steps in order:
     ```bash
     docker-compose up -d --build
     ```
+## 🚢 Production Deployment (VPS)
+
+This monorepo is heavily optimized for production environments using **Multi-stage Docker builds**. The production setup ensures zero development dependencies are shipped, drastically reducing image sizes and memory footprint.
+
+To deploy to a production VPS:
+
+1. Clone the repository on your server.
+2. Create a `.env` file replacing `localhost` with your actual domain/IP. *Note: `NEXT_PUBLIC_` variables must be present during the build phase as they are baked into the Next.js static files.*
+3. Spin up the production orchestrator:
+   ```bash
+   docker-compose -f docker-compose.prod.yml up -d --build
