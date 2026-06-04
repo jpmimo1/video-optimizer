@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: video_optimizer_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Port 5432 is not exposed externally for security reasons
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - video_network_prod
+
+  redis:
+    image: redis:7-alpine
+    container_name: video_optimizer_redis_prod
+    restart: unless-stopped
+    # Port 6379 is not exposed externally for security reasons
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - video_network_prod
+
+  nestjs-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: video_optimizer_api_prod
+    restart: unless-stopped
+    # Applies migrations before starting the application
+    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - R2_BUCKET=${R2_BUCKET}
+      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
+      - R2_SECRET_KEY=${R2_SECRET_KEY}
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+      - INTERNAL_API_URL=${INTERNAL_API_URL}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - PROCESS_TYPE=API
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - video_network_prod
+
+  nestjs-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: video_optimizer_worker_prod
+    restart: unless-stopped
+    command: node dist/src/main.js
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - R2_BUCKET=${R2_BUCKET}
+      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
+      - R2_SECRET_KEY=${R2_SECRET_KEY}
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+      - INTERNAL_API_URL=${INTERNAL_API_URL}
+      - PROCESS_TYPE=WORKER
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - video_network_prod
+
+  nextjs-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    container_name: video_optimizer_frontend_prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    # Kept in environment in case the Next.js Node server (API Routes/Server Actions) needs them at runtime
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - INTERNAL_API_URL=${INTERNAL_API_URL}
+    depends_on:
+      - nestjs-api
+    networks:
+      - video_network_prod
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+
+networks:
+  video_network_prod:
+    driver: bridge

@@ -1,0 +1,41 @@
+# ==========================================
+# Phase 1: Builder
+# ==========================================
+FROM node:22-alpine AS builder
+
+# Required by Prisma on Alpine Linux
+RUN apk add --no-cache openssl libc6-compat
+
+WORKDIR /app
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm ci
+RUN npx prisma generate
+
+COPY . .
+RUN npm run build
+
+# ==========================================
+# Phase 2: Production (Runner)
+# ==========================================
+FROM node:22-alpine AS runner
+
+# FFmpeg is required for video processing; OpenSSL/libc6-compat for Prisma
+RUN apk add --no-cache ffmpeg openssl libc6-compat
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package*.json ./
+COPY prisma ./prisma/
+COPY prisma.config.ts ./
+
+RUN npm ci --omit=dev
+RUN npx prisma generate
+
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 4000
+
+CMD ["node", "dist/src/main.js"]
