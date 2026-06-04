@@ -118,6 +118,7 @@ export class R2Service {
         Key: fileKey,
         Body: fileStream,
         ContentType: mimeType,
+        ContentDisposition: `attachment; filename="optimized-${originalName}"`,
       });
 
       await this.s3Client.send(command);

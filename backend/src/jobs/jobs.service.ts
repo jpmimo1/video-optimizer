@@ -91,6 +91,7 @@ export class JobsService {
       type: job.type,
       originalName: job.originalName,
       sizeOriginal: job.sizeOriginal,
+      sizeProcessed: job.sizeProcessed,
       createdAt: job.createdAt,
       expiresAt: job.expiresAt,
       videoUrl: downloadUrl,

@@ -14,7 +14,6 @@ const processType = process.env.PROCESS_TYPE || 'API';
     QueueModule,
     JobsModule,
     R2Module,
-    WorkerModule,
     ...(processType === 'WORKER' ? [WorkerModule] : []),
   ],
   controllers: [AppController],
